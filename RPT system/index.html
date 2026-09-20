@@ -1,0 +1,93 @@
+<!-- ============================================================
+     LOGIN SCREEN
+     ============================================================ -->
+<div id="loginScreen" class="login" role="main">
+    <link rel="stylesheet" href="style.css" />
+  <div class="login__card">
+
+    <div class="login__brand">
+      <div class="seal" aria-hidden="true">LGU</div>
+      <div>
+        <h1>Real Property Tax Management System</h1>
+        <p class="muted small">Municipality of Talisay &middot; Camarines Norte</p>
+      </div>
+    </div>
+
+   
+
+    <form id="loginForm" class="form" novalidate>
+      <div class="field">
+        <label for="loginUser">Username</label>
+        <input type="text" id="loginUser" class="input" placeholder="e.g. treasurer"
+               autocomplete="username" required aria-describedby="loginUserHelp" />
+        <small id="loginUserHelp" class="field__help">Use your assigned LGU IT staff account.</small>
+      </div>
+
+      <div class="field">
+        <label for="loginPass">Password</label>
+        <div class="input-group">
+          <input type="password" id="loginPass" class="input" placeholder="••••••••"
+                 autocomplete="current-password" required />
+          <button type="button" class="input-group__btn" id="togglePass"
+                  aria-label="Show password" aria-pressed="false">Show</button>
+        </div>
+      </div>
+
+      <div class="form__error" id="loginError" role="alert" hidden></div>
+
+      <button type="submit" class="btn btn--primary btn--block" id="btnLogin">
+        Sign in to Treasurer's Office
+      </button>
+
+      <p class="form__hint">
+        <b>treasurer</b> / <b>talisay123</b>
+      </p>
+    </form>
+
+    <p class="login__foot">
+     
+    </p>
+  </div>
+
+  <script>
+  document.getElementById('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const user = document.getElementById('loginUser').value.trim().toLowerCase();
+    const pass = document.getElementById('loginPass').value;
+    const err  = document.getElementById('loginError');
+
+    err.hidden = true;
+    err.textContent = '';
+
+    if (!user || !pass) {
+      err.textContent = 'Please enter both username and password.';
+      err.hidden = false;
+      return;
+    }
+
+    // Demo credentials
+    if (user === 'treasurer' && pass === 'talisay123') {
+      sessionStorage.setItem('rptUser', user);
+      sessionStorage.setItem('rptLoggedIn', 'true');
+      window.location.href = 'Tres_dashboard.html';   // <-- redirect
+    } else {
+      err.textContent = 'Invalid username or password. Please try again.';
+      err.hidden = false;
+      document.getElementById('loginPass').value = '';
+      document.getElementById('loginPass').focus();
+    }
+  });
+
+  // Show / hide password
+  document.getElementById('togglePass').addEventListener('click', function () {
+    const inp = document.getElementById('loginPass');
+    const btn = document.getElementById('togglePass');
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.textContent = show ? 'Hide' : 'Show';
+    btn.setAttribute('aria-pressed', String(show));
+  });
+</script>
+
+</div>
