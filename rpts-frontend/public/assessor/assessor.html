@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LGU Talisay — Record of Assessment (ROA) System</title>
+<style>
+  /*
+    3-color palette (brand colors only — grays/white below are
+    structural neutrals, not counted as palette colors):
+      --navy   : primary  (structure, headers, default actions)
+      --gold   : accent   (highlights, approved / in-progress states)
+      --maroon : alerts   (errors, destructive / cancelled states)
+  */
+  :root{
+    --navy:#14304D; --navy-700:#1D4066; --navy-50:#EAF1F8;
+    --gold:#B8912E; --gold-tint:#FBF3DE; --gold-800:#7A611D;
+    --maroon:#7A1F2B; --maroon-tint:#F7E6E8; --maroon-800:#5A1620;
+    --card:#FFFFFF; --bg:#F4F5F7; --ink:#1F2430; --ink-600:#5B6272; --ink-400:#8A92A3;
+    --border:#E2E5EA; --radius:12px;
+    --green-tint:#E7F3EA; --green-800:#1E6B3A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;}
+  h1,h2,h3{font-family:Georgia,serif;color:var(--navy);margin:0;}
+  button{font-family:inherit;}
+
+  .skip-link{position:absolute;left:-9999px;top:0;background:var(--navy);color:#fff;padding:10px 16px;border-radius:0 0 8px 0;font-size:13px;font-weight:600;z-index:1300;}
+  .skip-link:focus{left:0;}
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
+    outline:2.5px solid var(--gold);outline-offset:2px;border-radius:4px;
+  }
+
+  /* ---------- Layout ---------- */
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:242px;background:var(--navy);color:#EAF0F7;display:flex;flex-direction:column;padding:18px 0;overflow-y:auto;}
+  .brand{padding:0 20px 16px;border-bottom:1px solid rgba(255,255,255,0.12);margin-bottom:10px;}
+  .brand .b1{font-family:Georgia,serif;font-size:15px;font-weight:700;line-height:1.3;}
+  .brand .b2{font-size:11px;color:#B9C6D8;margin-top:3px;letter-spacing:.02em;}
+  .nav-label{padding:10px 20px 4px;font-size:10.5px;letter-spacing:.08em;color:#8FA2BC;text-transform:uppercase;}
+  .nav-item{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:#DCE5F0;padding:11px 20px;font-size:13.3px;text-align:left;cursor:pointer;border-left:3px solid transparent;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;}
+  .nav-item:hover{background:rgba(255,255,255,0.06);}
+  .nav-item.active{background:rgba(184,145,46,0.16);border-left-color:var(--gold);color:#fff;font-weight:600;}
+  .content{margin-left:242px;min-height:100vh;}
+  .content:focus{outline:none;}
+  .topbar{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;gap:16px;z-index:20;}
+  .topbar h2{font-size:17px;}
+  .breadcrumb{font-size:11.5px;color:var(--ink-400);margin-top:2px;}
+  .search-wrap{margin-left:auto;position:relative;width:340px;}
+  .search-wrap input{width:100%;padding:9px 14px 9px 34px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+  .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--ink-400);fill:none;stroke-width:2;}
+  .search-hint{position:absolute;top:38px;left:0;font-size:11px;color:var(--maroon);display:none;}
+  .search-hint.show{display:block;}
+  .page{padding:22px 28px 60px;}
+
+  /* ---------- Cards / tables ---------- */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;margin-bottom:18px;}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+  .stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;border-top:3px solid var(--navy);}
+  .stat-card.accent{border-top-color:var(--gold);}
+  .stat-card.alert{border-top-color:var(--maroon);}
+  .stat-card .label{font-size:11px;color:var(--ink-400);text-transform:uppercase;letter-spacing:.04em;}
+  .stat-card .value{font-family:Georgia,serif;font-size:24px;color:var(--navy);margin-top:4px;}
+  .two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;align-items:start;}
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  th{text-align:left;padding:9px 10px;background:var(--navy-50);color:var(--navy);font-weight:600;border-bottom:1px solid var(--border);position:sticky;top:0;}
+  td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr.empty-row td{text-align:center;color:var(--ink-400);padding:26px 10px;}
+  th[data-sort]{cursor:pointer;user-select:none;white-space:nowrap;}
+  th[data-sort]:hover{color:var(--navy-700);}
+  th[data-sort] .sort-arrow{display:inline-block;margin-left:4px;font-size:9px;opacity:.35;}
+  th[data-sort][aria-sort="ascending"] .sort-arrow, th[data-sort][aria-sort="descending"] .sort-arrow{opacity:1;color:var(--navy-700);}
+  th[data-sort][aria-sort="ascending"] .sort-arrow::after{content:"\25B2";}
+  th[data-sort][aria-sort="descending"] .sort-arrow::after{content:"\25BC";}
+  th[data-sort]:not([aria-sort="ascending"]):not([aria-sort="descending"]) .sort-arrow::after{content:"\25B4\25BE";letter-spacing:-2px;}
+  .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+  .tag.taxable{background:var(--gold-tint);color:var(--gold-800);}
+  .tag.exempt{background:var(--navy-50);color:var(--navy);}
+  .tag.approved{background:var(--green-tint);color:var(--green-800);}
+  .tag.pending{background:var(--gold-tint);color:var(--gold-800);}
+  .tag.cancelled{background:var(--maroon-tint);color:var(--maroon-800);}
+  .row-actions button{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11.8px;cursor:pointer;color:var(--navy);}
+  .row-actions button:hover{background:var(--navy-50);}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
+  .toolbar select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.8px;}
+  .toolbar .count{margin-left:auto;font-size:12px;color:var(--ink-400);}
+  .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:12px;color:var(--ink-400);}
+  .pg-btns button{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;margin-left:6px;}
+  .pg-btns button:disabled{opacity:.45;cursor:not-allowed;}
+
+  /* ---------- Form ---------- */
+  .form-section-title{font-size:13px;font-weight:700;color:var(--navy);margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--border);}
+  .form-section-title:first-child{margin-top:0;padding-top:0;border-top:none;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 18px;}
+  .field label{display:block;font-size:12.3px;font-weight:600;color:var(--ink);margin-bottom:5px;}
+  .field label .hint{font-weight:400;color:var(--ink-400);font-size:11px;}
+  .field input, .field select, .field textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;}
+  .field input[readonly]{background:var(--bg);color:var(--ink-600);}
+  .field input:disabled{background:var(--bg);color:var(--ink-400);}
+  .field textarea{resize:vertical;min-height:64px;}
+  .field.invalid input, .field.invalid select{border-color:var(--maroon);background:var(--maroon-tint);}
+  .field-error{font-size:11.3px;color:var(--maroon);margin-top:4px;min-height:14px;}
+  .computed-box{background:var(--navy-50);border:1px dashed var(--navy-700);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--navy-700);margin-top:14px;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;}
+  .checkbox-row input{width:auto;}
+  .form-banner{padding:11px 14px;border-radius:8px;font-size:12.8px;margin-bottom:14px;display:none;}
+  .form-banner.error{display:block;background:var(--maroon-tint);color:var(--maroon-800);}
+  .form-banner.show{display:block;}
+  .form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+  .btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-primary:hover{background:var(--navy-700);}
+  .btn-secondary{background:#fff;color:var(--navy);border-color:var(--border);}
+  .btn-secondary:hover{background:var(--navy-50);}
+  .btn-danger{background:var(--maroon);color:#fff;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-sm{padding:7px 14px;font-size:12px;}
+
+  /* ---------- Toasts ---------- */
+  .toast-container{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column;gap:10px;z-index:1400;max-width:340px;}
+  .toast{background:var(--navy);color:#fff;padding:12px 16px;border-radius:8px;font-size:12.8px;font-weight:600;box-shadow:0 8px 24px rgba(20,48,77,0.28);display:flex;align-items:flex-start;gap:10px;opacity:0;transform:translateY(8px);transition:opacity .18s ease,transform .18s ease;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.error{background:var(--maroon);}
+  .toast.info{background:#3E4C5E;}
+  .toast .toast-icon{flex-shrink:0;margin-top:1px;}
+  .toast .toast-msg{flex:1;line-height:1.4;}
+  .toast .toast-close{flex-shrink:0;background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;font-size:15px;line-height:1;padding:0;}
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{position:fixed;inset:0;background:rgba(20,48,77,0.45);display:flex;align-items:center;justify-content:center;z-index:1300;padding:20px;}
+  .modal-overlay[hidden]{display:none;}
+  .modal-box{background:var(--card);border-radius:var(--radius);padding:26px 28px;max-width:400px;width:100%;box-shadow:0 20px 50px rgba(20,48,77,0.25);}
+  .modal-box .m-icon{width:44px;height:44px;border-radius:50%;background:var(--maroon-tint);color:var(--maroon);display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
+  .modal-box h3{margin:0 0 8px;font-size:16px;}
+  .modal-box p{margin:0 0 20px;font-size:12.8px;color:var(--ink-600);line-height:1.55;}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;}
+
+  .report-list li{list-style:none;}
+  .report-list{padding:0;margin:0;}
+  .report-list-item{width:100%;display:flex;align-items:center;gap:12px;background:none;border:none;border-bottom:1px solid var(--border);padding:13px 4px;text-align:left;cursor:pointer;font-size:13.3px;color:var(--ink);}
+  .report-list-item:hover{background:var(--navy-50);}
+  .report-list-item .r-num{width:22px;height:22px;border-radius:50%;background:var(--navy-50);color:var(--navy);font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;}
+  .report-list-item .r-arrow{margin-left:auto;color:var(--ink-400);}
+  .back-link{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--navy);background:none;border:none;cursor:pointer;margin-bottom:14px;padding:0;}
+  .report-filters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+  .report-preview{border:1px dashed var(--border);border-radius:8px;padding:30px;text-align:center;color:var(--ink-400);font-size:12.8px;}
+
+  @media (max-width:1000px){
+    .form-grid{grid-template-columns:1fr 1fr;}
+    .stat-grid{grid-template-columns:1fr 1fr;}
+    .two-col{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#mainContent">Skip to main content</a>
+
+<aside class="sidebar" aria-label="Primary">
+  <div class="brand">
+    <div class="b1">LGU Talisay</div>
+    <div class="b2">Assessor's Office &mdash; ROA System</div>
+  </div>
+  <div class="nav-label">Main</div>
+  <button class="nav-item" type="button" data-view="dashboard">
+    <svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>
+    Dashboard
+  </button>
+  <button class="nav-item" type="button" data-view="roa-list">
+    <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+    Record of Assessment
+  </button>
+  <button class="nav-item" type="button" data-view="roa-form" data-mode="new">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    Encode / Update ROA
+  </button>
+  <button class="nav-item" type="button" data-view="reports-list">
+    <svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 12h6M9 16h6M9 8h3"/></svg>
+    Reports
+  </button>
+  <div style="margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,0.12);">
+    <button class="nav-item" type="button" data-view="logout">
+      <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      Logout
+    </button>
+  </div>
+</aside>
+
+<div class="content" id="mainContent" tabindex="-1">
+  <div class="topbar">
+    <div>
+      <h2 id="pageTitle">Dashboard</h2>
+      <div class="breadcrumb" id="pageBreadcrumb">Assessor's Office</div>
+    </div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" id="globalSearch" placeholder="Search by Owner, ARP No., or PIN..." aria-label="Search by Owner, ARP No., or PIN" aria-describedby="searchHint">
+      <div class="search-hint" id="searchHint" role="status" aria-live="polite">Only letters, numbers, spaces and hyphens are searchable.</div>
+    </div>
+  </div>
+
+  <div class="page">
+
+    <!-- ============ DASHBOARD ============ -->
+    <div id="view-dashboard">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="label">Total ROA Records</div><div class="value" id="statTotal">0</div></div>
+        <div class="stat-card accent"><div class="label">Total Present Assessed Value</div><div class="value" id="statAV">&#8369;0</div></div>
+        <div class="stat-card"><div class="label">Taxable Properties</div><div class="value" id="statTaxable">0</div></div>
+        <div class="stat-card alert"><div class="label">Pending Approval</div><div class="value" id="statPending">0</div></div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <h3 style="font-size:14px;margin-bottom:12px;">Recent ROA entries</h3>
+          <table>
+            <thead><tr><th>ARP No.</th><th>Owner</th><th>Barangay</th><th>Present AV</th><th>Status</th></tr></thead>
+            <tbody id="recentRoaBody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3 style="font-size:14px;margin-bottom:12px;">By classification</h3>
+          <table><tbody id="byClassBody"></tbody></table>
+          <h3 style="font-size:14px;margin:18px 0 12px;">By barangay</h3>
+          <table><tbody id="byBarangayBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ROA LIST ============ -->
+    <div id="view-roa-list" style="display:none;">
+      <div class="card">
+        <div class="toolbar">
+          <select id="classFilter">
+            <option value="">All classifications</option>
+            <option>Residential Land</option><option>Agricultural Land</option>
+            <option>Commercial Land</option><option>Industrial Land</option>
+            <option>Tax-Exempt (Government/Church/School)</option>
+          </select>
+          <select id="barangayFilter">
+            <option value="">All barangays</option>
+            <option>Sta. Elena</option><option>Poblacion</option><option>San Roque</option>
+            <option>Zone 3</option><option>Linao</option><option>Dawis</option><option>Cogon</option>
+          </select>
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+            <option value="Taxable">Taxable</option><option value="Exempt">Exempt</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+          <button class="btn btn-primary btn-sm" type="button" data-view="roa-form" data-mode="new">+ New ROA Entry</button>
+          <span class="count" id="roaCount"></span>
+        </div>
+        <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th data-sort="arpNo" aria-sort="none" tabindex="0">ARP No. <span class="sort-arrow"></span></th>
+            <th data-sort="owner" aria-sort="none" tabindex="0">Owner <span class="sort-arrow"></span></th>
+            <th data-sort="pin" aria-sort="none" tabindex="0">PIN <span class="sort-arrow"></span></th>
+            <th data-sort="barangay" aria-sort="none" tabindex="0">Barangay <span class="sort-arrow"></span></th>
+            <th data-sort="classification" aria-sort="none" tabindex="0">Classification <span class="sort-arrow"></span></th>
+            <th data-sort="landAreaPresent" aria-sort="none" tabindex="0">Land Area <span class="sort-arrow"></span></th>
+            <th data-sort="marketValuePresent" aria-sort="none" tabindex="0">Present MV <span class="sort-arrow"></span></th>
+            <th data-sort="assessedValuePresent" aria-sort="none" tabindex="0">Present AV <span class="sort-arrow"></span></th>
+            <th data-sort="taxStatus" aria-sort="none" tabindex="0">Status <span class="sort-arrow"></span></th>
+            <th data-sort="tCode" aria-sort="none" tabindex="0">T Code <span class="sort-arrow"></span></th>
+            <th>Approval</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="roaTableBody"></tbody>
+        </table>
+        </div>
+        <div class="pagination"><span id="roaPageInfo"></span><div class="pg-btns"><button type="button" id="roaPrevBtn" aria-label="Previous page">&larr; Prev</button><button type="button" id="roaNextBtn" aria-label="Next page">Next &rarr;</button></div></div>
+      </div>
+    </div>
+
+    <!-- ============ ENCODE / UPDATE ROA FORM ============ -->
+    <div id="view-roa-form" style="display:none;">
+      <div class="card">
+        <h3 id="roaFormTitle" style="font-size:15px;margin-bottom:4px;">Encode New ROA Entry</h3>
+        <p style="font-size:12.3px;color:var(--ink-600);margin:0 0 16px;">Transcribe the fields exactly as they appear on the Province-approved Record of Assessment. Increase/Decrease is computed automatically.</p>
+        <div class="form-banner" id="roaFormBanner" role="alert"></div>
+        <form id="roaForm" novalidate>
+
+          <div class="form-section-title">Identification</div>
+          <div class="form-grid">
+            <div class="field" id="field-date"><label for="date">Date</label><input type="date" id="date" aria-describedby="error-date"><div class="field-error" id="error-date" role="alert"></div></div>
+            <div class="field" id="field-arpNo"><label for="arpNo">ARP No. <span class="hint">e.g. 014-00559</span></label><input type="text" id="arpNo" placeholder="014-00559" aria-describedby="error-arpNo"><div class="field-error" id="error-arpNo" role="alert"></div></div>
+            <div class="field" id="field-pin"><label for="pin">PIN <span class="hint">e.g. 03-063</span></label><input type="text" id="pin" placeholder="03-063" aria-describedby="error-pin"><div class="field-error" id="error-pin" role="alert"></div></div>
+            <div class="field" id="field-owner" style="grid-column:span 2;"><label for="owner">Name of Owner</label><input type="text" id="owner" placeholder="e.g. Benoza, Amparo P. / Condrado Abriol Padilla et al." aria-describedby="error-owner"><div class="field-error" id="error-owner" role="alert"></div></div>
+            <div class="field" id="field-barangay"><label for="barangay">Barangay</label>
+              <select id="barangay" aria-describedby="error-barangay">
+                <option value="">Select barangay</option>
+                <option>Sta. Elena</option><option>Poblacion</option><option>San Roque</option>
+                <option>Zone 3</option><option>Linao</option><option>Dawis</option><option>Cogon</option>
+              </select>
+              <div class="field-error" id="error-barangay" role="alert"></div>
+            </div>
+            <div class="field" id="field-classification"><label for="classification">Classification</label>
+              <select id="classification" aria-describedby="error-classification">
+                <option value="">Select classification</option>
+                <option>Residential Land</option><option>Agricultural Land</option>
+                <option>Commercial Land</option><option>Industrial Land</option>
+                <option>Tax-Exempt (Government/Church/School)</option>
+              </select>
+              <div class="field-error" id="error-classification" role="alert"></div>
+            </div>
+            <div class="field" id="field-tCode"><label for="tCode">T Code <span class="hint">transaction type</span></label>
+              <select id="tCode" aria-describedby="error-tCode">
+                <option value="">Select T Code</option>
+                <option value="N">N &mdash; New Assessment</option>
+                <option value="R">R &mdash; Reassessment / Revision</option>
+                <option value="S">S &mdash; Subdivision</option>
+                <option value="C">C &mdash; Consolidation</option>
+                <option value="T">T &mdash; Transfer of Ownership</option>
+                <option value="X">X &mdash; Permanent Cancellation</option>
+              </select>
+              <div class="field-error" id="error-tCode" role="alert"></div>
+            </div>
+            <div class="field" id="field-cancelsArpn"><label for="cancelsArpn">Cancels ARPN <span class="hint">optional</span></label><input type="text" id="cancelsArpn" placeholder="e.g. 014-00556" aria-describedby="error-cancelsArpn"><div class="field-error" id="error-cancelsArpn" role="alert"></div></div>
+            <div class="field" id="field-taxesBeginYear"><label for="taxesBeginYear">Taxes Begin <span class="hint">year</span></label><input type="text" id="taxesBeginYear" placeholder="e.g. 2027" aria-describedby="error-taxesBeginYear"><div class="field-error" id="error-taxesBeginYear" role="alert"></div></div>
+          </div>
+
+          <div class="form-section-title">Present values (Columns A&ndash;D)</div>
+          <div class="form-grid">
+            <div class="field" id="field-landAreaPresent"><label for="landAreaPresent">Land Area (A) <span class="hint">sqm</span></label><input type="text" id="landAreaPresent" placeholder="e.g. 522" inputmode="decimal" aria-describedby="error-landAreaPresent"><div class="field-error" id="error-landAreaPresent" role="alert"></div></div>
+            <div class="field" id="field-marketValuePresent"><label for="marketValuePresent">Market Value (B)</label><input type="text" id="marketValuePresent" placeholder="e.g. 266,220.00" inputmode="decimal" aria-describedby="error-marketValuePresent"><div class="field-error" id="error-marketValuePresent" role="alert"></div></div>
+            <div class="field" id="field-assessmentLevel"><label for="assessmentLevel">Assessment Level <span class="hint">%, per document</span></label><input type="text" id="assessmentLevel" placeholder="e.g. 6" inputmode="decimal" aria-describedby="error-assessmentLevel"><div class="field-error" id="error-assessmentLevel" role="alert"></div></div>
+          </div>
+          <div class="computed-box">
+            Assessed Value (C) = Market Value (B) &times; Assessment Level &mdash; computed automatically as you type.<br>
+            <strong id="avPresentDisplay" style="font-size:15px;">&#8369; 0.00</strong>
+          </div>
+
+          <div class="form-section-title">Previous values (Columns F&ndash;H) <span style="font-weight:400;color:var(--ink-400);">&mdash; leave blank for a brand-new assessment</span></div>
+          <div class="form-grid">
+            <div class="field" id="field-landAreaPrevious"><label for="landAreaPrevious">Land Area (F) <span class="hint">optional</span></label><input type="text" id="landAreaPrevious" placeholder="0" inputmode="decimal" aria-describedby="error-landAreaPrevious"><div class="field-error" id="error-landAreaPrevious" role="alert"></div></div>
+            <div class="field" id="field-marketValuePrevious"><label for="marketValuePrevious">Market Value (G) <span class="hint">optional</span></label><input type="text" id="marketValuePrevious" placeholder="0.00" inputmode="decimal" aria-describedby="error-marketValuePrevious"><div class="field-error" id="error-marketValuePrevious" role="alert"></div></div>
+            <div class="field" id="field-assessedValuePrevious"><label for="assessedValuePrevious">Assessed Value (H) <span class="hint">optional</span></label><input type="text" id="assessedValuePrevious" placeholder="0.00" inputmode="decimal" aria-describedby="error-assessedValuePrevious"><div class="field-error" id="error-assessedValuePrevious" role="alert"></div></div>
+          </div>
+
+          <div class="form-section-title">Increase / Decrease (Columns I&ndash;K) <span style="font-weight:400;color:var(--ink-400);">&mdash; auto-computed, read-only</span></div>
+          <div class="form-grid">
+            <div class="field"><label for="landAreaChange">Land Area (I)</label><input type="text" id="landAreaChange" readonly></div>
+            <div class="field"><label for="marketValueChange">Market Value (J)</label><input type="text" id="marketValueChange" readonly></div>
+            <div class="field"><label for="assessedValueChange">Assessed Value (K)</label><input type="text" id="assessedValueChange" readonly></div>
+          </div>
+
+          <div class="form-section-title">Approval &amp; remarks</div>
+          <div class="form-grid">
+            <div class="field" style="align-self:end;">
+              <div class="checkbox-row"><input type="checkbox" id="approved"><label for="approved" style="margin:0;">Province-approved copy on file</label></div>
+            </div>
+            <div class="field" id="field-approvedDate"><label for="approvedDate">Date Approved <span class="hint">if approved</span></label><input type="date" id="approvedDate" aria-describedby="error-approvedDate"><div class="field-error" id="error-approvedDate" role="alert"></div></div>
+            <div class="field" id="field-remarks" style="grid-column:span 3;"><label for="remarks">Remarks <span class="hint">optional</span></label><textarea id="remarks" placeholder="Optional notes..."></textarea></div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-secondary" type="button" id="roaCancelBtn">Cancel</button>
+            <button class="btn btn-primary" type="submit" id="roaSaveBtn">Save Entry</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ============ REPORTS LIST ============ -->
+    <div id="view-reports-list" style="display:none;">
+      <div class="card">
+        <ul class="report-list" id="reportsListBody"></ul>
+      </div>
+    </div>
+
+    <!-- ============ REPORT DETAIL ============ -->
+    <div id="view-report-detail" style="display:none;">
+      <button class="back-link" type="button" data-view="reports-list">&larr; Back to Reports</button>
+      <div class="card">
+        <h3 id="reportTitle" style="font-size:15px;"></h3>
+        <p id="reportDesc" style="font-size:12.3px;color:var(--ink-600);margin:4px 0 16px;"></p>
+        <div class="report-filters">
+          <div class="field"><label for="reportBarangay">Barangay</label><select id="reportBarangay"><option>All Barangays</option><option>Sta. Elena</option><option>Poblacion</option><option>San Roque</option><option>Zone 3</option><option>Linao</option><option>Dawis</option><option>Cogon</option></select></div>
+          <div class="field"><label for="reportFrom">From</label><input type="date" id="reportFrom"></div>
+          <div class="field"><label for="reportTo">To</label><input type="date" id="reportTo"></div>
+        </div>
+        <div class="form-actions" style="margin-top:0;border-top:none;padding-top:0;justify-content:flex-start;">
+          <button class="btn btn-primary btn-sm" type="button" id="reportGenerateBtn">Generate</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="exportPdfBtn" disabled>Export PDF</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="exportCsvBtn" disabled>Export CSV</button>
+        </div>
+        <div class="report-preview" id="reportPreviewEmpty">Set filters and click Generate to preview this report.</div>
+        <div id="reportPreviewResult" style="display:none;overflow-x:auto;">
+          <table>
+            <thead><tr><th>ARP No.</th><th>Owner</th><th>Barangay</th><th>Classification</th><th>Land Area</th><th>Present MV</th><th>Present AV</th></tr></thead>
+            <tbody id="reportPreviewBody"></tbody>
+          </table>
+          <div id="reportTotalsRow" style="margin-top:10px;font-size:12.5px;color:var(--navy);font-weight:700;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LOGOUT ============ -->
+    <div id="view-logout" style="display:none;">
+      <div class="card" style="max-width:420px;">
+        <h3 style="font-size:15px;margin-bottom:10px;" id="logoutTitle">Log out of the ROA System?</h3>
+        <p id="logoutBody" style="font-size:12.8px;color:var(--ink-600);margin:0 0 18px;">Any unsaved changes on the current form will be lost.</p>
+        <div class="form-actions" style="border-top:none;padding-top:0;justify-content:flex-start;">
+          <button class="btn btn-secondary btn-sm" type="button" id="cancelLogoutBtn">Cancel</button>
+          <button class="btn btn-danger btn-sm" type="button" id="confirmLogoutBtn">Log Out</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
+<div class="modal-overlay" id="confirmModal" hidden role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle" aria-describedby="confirmModalBody">
+  <div class="modal-box">
+    <div class="m-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+    <h3 id="confirmModalTitle">Please confirm</h3>
+    <p id="confirmModalBody">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-sm" type="button" id="confirmModalCancel">Go Back</button>
+      <button class="btn btn-danger btn-sm" type="button" id="confirmModalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =====================================================================
+     UTILITIES
+  ===================================================================== */
+  const peso = n => "\u20B1" + Number(n).toLocaleString("en-PH", { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const escapeHtml = str => String(str).replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+
+  function showToast(message, type, duration){
+    try {
+      type = type || "success"; duration = duration || 4200;
+      const container = document.getElementById("toastContainer");
+      if (!container) return;
+      const toast = document.createElement("div");
+      toast.className = "toast " + type;
+      const icons = {
+        success:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>',
+        error:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+        info:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>'
+      };
+      toast.innerHTML = '<span class="toast-icon">' + (icons[type] || icons.info) + '</span>' +
+        '<span class="toast-msg">' + escapeHtml(message) + '</span>' +
+        '<button type="button" class="toast-close" aria-label="Dismiss notification">&times;</button>';
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add("show"));
+      const remove = () => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 200); };
+      toast.querySelector(".toast-close").addEventListener("click", remove);
+      setTimeout(remove, duration);
+    } catch (err){ console.error("showToast failed:", err); }
+  }
+
+  let confirmModalOnConfirm = null, confirmModalLastFocus = null;
+  function openConfirmModal({ title, body, confirmLabel, onConfirm }){
+    const overlay = document.getElementById("confirmModal");
+    document.getElementById("confirmModalTitle").textContent = title || "Please confirm";
+    document.getElementById("confirmModalBody").textContent = body || "Are you sure you want to proceed?";
+    document.getElementById("confirmModalConfirm").textContent = confirmLabel || "Confirm";
+    confirmModalOnConfirm = onConfirm;
+    confirmModalLastFocus = document.activeElement;
+    overlay.hidden = false;
+    document.getElementById("confirmModalConfirm").focus();
+  }
+  function closeConfirmModal(){
+    document.getElementById("confirmModal").hidden = true;
+    confirmModalOnConfirm = null;
+    if (confirmModalLastFocus && typeof confirmModalLastFocus.focus === "function") confirmModalLastFocus.focus();
+  }
+  document.getElementById("confirmModalCancel").addEventListener("click", closeConfirmModal);
+  document.getElementById("confirmModalConfirm").addEventListener("click", () => { const fn = confirmModalOnConfirm; closeConfirmModal(); if (typeof fn === "function") fn(); });
+  document.getElementById("confirmModal").addEventListener("click", e => { if (e.target.id === "confirmModal") closeConfirmModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !document.getElementById("confirmModal").hidden) closeConfirmModal(); });
+
+  function parseCurrency(str){
+    const cleaned = String(str).replace(/,/g, "").trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+    const val = parseFloat(cleaned);
+    return Number.isNaN(val) ? null : val;
+  }
+  function parsePercent(str){
+    const cleaned = String(str).replace(/%/g, "").trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+    const val = parseFloat(cleaned);
+    return (Number.isNaN(val) || val < 0 || val > 100) ? null : val;
+  }
+  function parseArea(str){
+    const cleaned = String(str).replace(/,/g, "").trim();
+    if (cleaned === "") return 0;
+    if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+    return parseFloat(cleaned);
+  }
+
+  /* =====================================================================
+     DATA — seeded from the actual Record of Assessment ledger sample
+     (Barangay Sta. Elena, Municipality of Talisay, Province of Camarines
+     Norte) plus a few illustrative extra rows to show other statuses.
+  ===================================================================== */
+  const T_CODE_LABEL = { N:"New Assessment", R:"Reassessment/Revision", S:"Subdivision", C:"Consolidation", T:"Transfer of Ownership", X:"Permanent Cancellation" };
+
+  let ROA_RECORDS = [
+    { arpNo:"014-00556", owner:"Benoza, Amparo P. / Condrado Abriol Padilla et al.", pin:"03-063", barangay:"Sta. Elena", classification:"Residential Land", tCode:"X", cancelsArpn:"", date:"2020-03-12", landAreaPresent:522, marketValuePresent:191557.12, assessmentLevel:15, assessedValuePresent:28730, taxesBeginYear:"2020", landAreaPrevious:0, marketValuePrevious:0, assessedValuePrevious:0, taxStatus:"Cancelled", approved:true, approvedDate:"2020-03-20", remarks:"Superseded by ARP 014-00559." },
+    { arpNo:"014-00559", owner:"Benoza, Amparo P. / Condrado Abriol Padilla et al.", pin:"03-063", barangay:"Sta. Elena", classification:"Residential Land", tCode:"R", cancelsArpn:"014-00556", date:"2026-07-31", landAreaPresent:522, marketValuePresent:266220, assessmentLevel:6, assessedValuePresent:15970, taxesBeginYear:"2027", landAreaPrevious:522, marketValuePrevious:191557.12, assessedValuePrevious:28730, taxStatus:"Taxable", approved:true, approvedDate:"2026-08-05", remarks:"" },
+    { arpNo:"014-00560", owner:"Benoza, Amparo P. / Padilla et al.", pin:"03-064", barangay:"Sta. Elena", classification:"Residential Land", tCode:"R", cancelsArpn:"", date:"2026-07-31", landAreaPresent:250, marketValuePresent:127500, assessmentLevel:6, assessedValuePresent:7650, taxesBeginYear:"2027", landAreaPrevious:0, marketValuePrevious:0, assessedValuePrevious:0, taxStatus:"Taxable", approved:true, approvedDate:"2026-08-05", remarks:"" },
+    { arpNo:"014-00561", owner:"Benoza, Amparo P. / Padilla et al.", pin:"03-065", barangay:"Sta. Elena", classification:"Residential Land", tCode:"R", cancelsArpn:"", date:"2026-07-31", landAreaPresent:250, marketValuePresent:127500, assessmentLevel:6, assessedValuePresent:7650, taxesBeginYear:"2027", landAreaPrevious:0, marketValuePrevious:0, assessedValuePrevious:0, taxStatus:"Taxable", approved:true, approvedDate:"2026-08-05", remarks:"" },
+    { arpNo:"014-00562", owner:"Benoza, Amparo P. / Padilla et al.", pin:"03-066", barangay:"Sta. Elena", classification:"Residential Land", tCode:"R", cancelsArpn:"", date:"2026-07-31", landAreaPresent:250, marketValuePresent:127500, assessmentLevel:6, assessedValuePresent:7650, taxesBeginYear:"2027", landAreaPrevious:0, marketValuePrevious:0, assessedValuePrevious:0, taxStatus:"Taxable", approved:true, approvedDate:"2026-08-05", remarks:"" },
+    { arpNo:"014-00563", owner:"Benoza, Amparo P. / Padilla et al.", pin:"03-067", barangay:"Sta. Elena", classification:"Residential Land", tCode:"R", cancelsArpn:"", date:"2026-07-31", landAreaPresent:400, marketValuePresent:204000, assessmentLevel:6, assessedValuePresent:12240, taxesBeginYear:"2027", landAreaPrevious:0, marketValuePrevious:0, assessedValuePrevious:0, taxStatus:"Taxable", approved:true, approvedDate:"2026-08-05", remarks:"" },
+    { arpNo:"014-00600", owner:"Barangay Poblacion Health Center", pin:"05-012", barangay:"Poblacion", classification:"Tax-Exempt (Government/Church/School)", tCode:"N", cancelsArpn:"", date:"2026-06-02", landAreaPresent:800, marketValuePresent:450000, assessmentLevel:0, assessedValuePresent:0, taxesBeginYear:"2027", landAreaPrevious:0, marketValuePrevious:0, assessedValuePrevious:0, taxStatus:"Exempt", approved:true, approvedDate:"2026-06-10", remarks:"Government-owned health facility." },
+    { arpNo:"014-00601", owner:"Dela Cruz, Ramon S.", pin:"07-021", barangay:"San Roque", classification:"Commercial Land", tCode:"N", cancelsArpn:"", date:"2026-09-01", landAreaPresent:300, marketValuePresent:1800000, assessmentLevel:50, assessedValuePresent:900000, taxesBeginYear:"2027", landAreaPrevious:0, marketValuePrevious:0, assessedValuePrevious:0, taxStatus:"Taxable", approved:false, approvedDate:"", remarks:"Awaiting Provincial Assessor approval." }
+  ];
+
+  const REPORTS = [
+    { id:"roll", title:"Assessment Roll (Taxable Properties)", desc:"All present-value ROA entries currently classified as taxable." },
+    { id:"exempt", title:"List of Tax-Exempt Properties", desc:"Properties tagged Tax-Exempt under the current classification." },
+    { id:"new", title:"List of Newly Assessed Properties (T Code: N)", desc:"ROA entries encoded as a brand-new assessment." },
+    { id:"reassessed", title:"List of Reassessed / Revised Properties (T Code: R)", desc:"Entries recorded as a revision of a prior assessment." },
+    { id:"cancelled", title:"List of Permanently Cancelled ARPs (T Code: X)", desc:"ARP numbers marked as permanently cancelled." },
+    { id:"pending", title:"List Pending Provincial Approval", desc:"Encoded entries not yet marked as Province-approved." },
+    { id:"summary", title:"Summary by Barangay & Classification", desc:"Aggregate land area, market value, and assessed value totals." }
+  ];
+
+  /* =====================================================================
+     REGEX VALIDATION
+  ===================================================================== */
+  const MAX_FMV = 999999999.99;
+  const VALIDATORS = {
+    date:{ regex:/^\d{4}-\d{2}-\d{2}$/, message:"Select a valid date." },
+    arpNo:{ regex:/^\d{3}-\d{5}$/, message:"Format must be 000-00000 (e.g. 014-00559)." },
+    pin:{ regex:/^\d{2}-\d{3}$/, message:"Format must be 00-000 (e.g. 03-063)." },
+    owner:{ regex:/^[A-Za-z\u00C0-\u017F.,\/&()'\- ]{2,120}$/, message:"Enter a valid owner name (letters, spaces, . , / & ' - only)." },
+    cancelsArpn:{ regex:/^\d{3}-\d{5}$/, message:"Format must be 000-00000 (e.g. 014-00556)." },
+    taxesBeginYear:{ regex:/^(19|20)\d{2}$/, message:"Enter a valid 4-digit year." },
+    landAreaPresent:{ regex:/^\d+(\.\d{1,2})?$/, message:"Enter land area in sqm (numbers only)." },
+    marketValuePresent:{ regex:/^\d{1,3}(,\d{3})*(\.\d{1,2})?$|^\d+(\.\d{1,2})?$/, message:"Enter a valid amount, e.g. 266,220.00." },
+    assessmentLevel:{ regex:/^\d{1,3}(\.\d{1,2})?%?$/, message:"Enter a percentage from 0 to 100." },
+    landAreaPrevious:{ regex:/^\d*(\.\d{1,2})?$/, message:"Enter land area in sqm, or leave blank." },
+    marketValuePrevious:{ regex:/^\d{0,3}(,\d{3})*(\.\d{1,2})?$|^\d*(\.\d{1,2})?$/, message:"Enter a valid amount, or leave blank." },
+    assessedValuePrevious:{ regex:/^\d{0,3}(,\d{3})*(\.\d{1,2})?$|^\d*(\.\d{1,2})?$/, message:"Enter a valid amount, or leave blank." },
+    approvedDate:{ regex:/^\d{4}-\d{2}-\d{2}$/, message:"Select the date this ROA was Province-approved." }
+  };
+  const REQUIRED_FIELDS = ["date","arpNo","pin","owner","barangay","classification","tCode","taxesBeginYear","landAreaPresent","marketValuePresent","assessmentLevel"];
+  const OPTIONAL_FIELDS = ["cancelsArpn","landAreaPrevious","marketValuePrevious","assessedValuePrevious"];
+
+  let roaEditingArp = null; // null = new entry; ARP string = editing that record
+
+  function setFieldError(key, msg){
+    const wrap = document.getElementById("field-" + key);
+    const err = document.getElementById("error-" + key);
+    if (!wrap || !err) return;
+    if (msg){ wrap.classList.add("invalid"); err.textContent = msg; document.getElementById(key).setAttribute("aria-invalid","true"); }
+    else { wrap.classList.remove("invalid"); err.textContent = ""; document.getElementById(key).removeAttribute("aria-invalid"); }
+  }
+
+  function activeRecordsExcept(arp){
+    return ROA_RECORDS.filter(r => r.tCode !== "X" && r.arpNo !== arp);
+  }
+
+  function validateField(key){
+    try {
+      if (key === "barangay" || key === "classification" || key === "tCode"){
+        const val = document.getElementById(key).value;
+        const msg = val ? "" : "This field is required.";
+        setFieldError(key, msg);
+        return !msg;
+      }
+      if (key === "approvedDate"){
+        const approvedChecked = document.getElementById("approved").checked;
+        const value = document.getElementById("approvedDate").value.trim();
+        if (!approvedChecked){ setFieldError("approvedDate", ""); return true; }
+        const valid = VALIDATORS.approvedDate.regex.test(value);
+        setFieldError("approvedDate", valid ? "" : "Select the date this ROA was Province-approved.");
+        return valid;
+      }
+      const isOptional = OPTIONAL_FIELDS.includes(key);
+      const input = document.getElementById(key);
+      const rule = VALIDATORS[key];
+      const value = input.value.trim();
+
+      if (isOptional && value === ""){ setFieldError(key, ""); return true; }
+      if (!isOptional && value === ""){ setFieldError(key, "This field is required."); return false; }
+
+      let valid = rule.regex.test(value);
+      let message = rule.message;
+
+      if (valid && key === "marketValuePresent"){
+        const amount = parseCurrency(value);
+        if (amount === null || amount <= 0){ valid = false; message = "Market Value must be greater than \u20B10.00."; }
+        else if (amount > MAX_FMV){ valid = false; message = "That amount looks too large \u2014 please verify."; }
+      }
+      if (valid && key === "assessmentLevel"){
+        const pct = parsePercent(value);
+        if (pct === null){ valid = false; message = "Enter a percentage from 0 to 100."; }
+      }
+      if (valid && key === "landAreaPresent"){
+        const area = parseArea(value);
+        if (area === null || area <= 0){ valid = false; message = "Land area must be greater than 0 sqm."; }
+      }
+      if (valid && key === "arpNo"){
+        if (!roaEditingArp && activeRecordsExcept(null).some(r => r.arpNo === value)){
+          valid = false; message = "This ARP No. already exists. Use \u201cEdit\u201d from the list instead.";
+        }
+      }
+      if (valid && key === "pin"){
+        if (!roaEditingArp && activeRecordsExcept(null).some(r => r.pin === value)){
+          valid = false; message = "This PIN already has an active ROA entry on file.";
+        }
+      }
+      if (valid && key === "cancelsArpn" && value !== ""){
+        // format already checked by regex; no further existence requirement (may reference a paper/legacy ARP not yet migrated)
+      }
+
+      setFieldError(key, valid ? "" : message);
+      return valid;
+    } catch (err){
+      console.error("Validation error for field '" + key + "':", err);
+      setFieldError(key, "Unable to validate this field.");
+      return false;
+    }
+  }
+
+  function recomputePresentAV(){
+    const mv = parseCurrency(document.getElementById("marketValuePresent").value);
+    const lvl = parsePercent(document.getElementById("assessmentLevel").value);
+    const av = (mv !== null && lvl !== null) ? mv * (lvl / 100) : null;
+    document.getElementById("avPresentDisplay").textContent = av !== null ? peso(av) : "\u20B1 0.00";
+    return av;
+  }
+  function recomputeChanges(){
+    const a = parseArea(document.getElementById("landAreaPresent").value) || 0;
+    const f = parseArea(document.getElementById("landAreaPrevious").value) || 0;
+    const b = parseCurrency(document.getElementById("marketValuePresent").value) || 0;
+    const g = parseCurrency(document.getElementById("marketValuePrevious").value) || 0;
+    const c = recomputePresentAV() || 0;
+    const h = parseCurrency(document.getElementById("assessedValuePrevious").value) || 0;
+    document.getElementById("landAreaChange").value = (a - f).toLocaleString();
+    document.getElementById("marketValueChange").value = peso(b - g);
+    document.getElementById("assessedValueChange").value = peso(c - h);
+  }
+  ["marketValuePresent","assessmentLevel","landAreaPresent","landAreaPrevious","marketValuePrevious","assessedValuePrevious"].forEach(id => {
+    document.getElementById(id).addEventListener("input", recomputeChanges);
+  });
+  document.getElementById("classification").addEventListener("change", () => {
+    const val = document.getElementById("classification").value;
+    if (val.startsWith("Tax-Exempt")){ document.getElementById("assessmentLevel").value = "0"; recomputeChanges(); }
+  });
+  document.getElementById("approved").addEventListener("change", () => {
+    document.getElementById("approvedDate").disabled = !document.getElementById("approved").checked;
+    if (!document.getElementById("approved").checked){ document.getElementById("approvedDate").value = ""; setFieldError("approvedDate", ""); }
+  });
+
+  function resetRoaForm(record){
+    roaEditingArp = record ? record.arpNo : null;
+    document.getElementById("roaFormTitle").textContent = record ? ("Update ROA Entry — ARP " + record.arpNo) : "Encode New ROA Entry";
+    document.getElementById("roaSaveBtn").textContent = record ? "Update Entry" : "Save Entry";
+    document.getElementById("roaFormBanner").className = "form-banner";
+    const fields = ["date","arpNo","pin","owner","barangay","classification","tCode","cancelsArpn","taxesBeginYear","landAreaPresent","marketValuePresent","assessmentLevel","landAreaPrevious","marketValuePrevious","assessedValuePrevious","remarks"];
+    fields.forEach(f => { document.getElementById(f).value = record ? (record[f] !== undefined ? record[f] : "") : ""; setFieldError(f, ""); });
+    document.getElementById("approved").checked = record ? !!record.approved : false;
+    document.getElementById("approvedDate").value = record ? (record.approvedDate || "") : "";
+    document.getElementById("approvedDate").disabled = !document.getElementById("approved").checked;
+    recomputeChanges();
+  }
+
+  function validateRoaForm(){
+    const fields = REQUIRED_FIELDS.concat(OPTIONAL_FIELDS).concat(["approvedDate"]);
+    return fields.reduce((ok, f) => validateField(f) && ok, true);
+  }
+
+  function collectRoaFormData(){
+    const av = recomputePresentAV() || 0;
+    const a = parseArea(document.getElementById("landAreaPresent").value) || 0;
+    const f = parseArea(document.getElementById("landAreaPrevious").value) || 0;
+    const b = parseCurrency(document.getElementById("marketValuePresent").value) || 0;
+    const g = parseCurrency(document.getElementById("marketValuePrevious").value) || 0;
+    const h = parseCurrency(document.getElementById("assessedValuePrevious").value) || 0;
+    const classification = document.getElementById("classification").value;
+    return {
+      date: document.getElementById("date").value,
+      arpNo: document.getElementById("arpNo").value.trim(),
+      pin: document.getElementById("pin").value.trim(),
+      owner: document.getElementById("owner").value.trim(),
+      barangay: document.getElementById("barangay").value,
+      classification, tCode: document.getElementById("tCode").value,
+      cancelsArpn: document.getElementById("cancelsArpn").value.trim(),
+      taxesBeginYear: document.getElementById("taxesBeginYear").value.trim(),
+      landAreaPresent: a, marketValuePresent: b, assessmentLevel: parsePercent(document.getElementById("assessmentLevel").value) || 0,
+      assessedValuePresent: av, landAreaPrevious: f, marketValuePrevious: g, assessedValuePrevious: h,
+      taxStatus: classification.startsWith("Tax-Exempt") ? "Exempt" : "Taxable",
+      approved: document.getElementById("approved").checked,
+      approvedDate: document.getElementById("approvedDate").value,
+      remarks: document.getElementById("remarks").value.trim()
+    };
+  }
+
+  function saveRoaRecord(){
+    const data = collectRoaFormData();
+    if (data.tCode === "X") data.taxStatus = "Cancelled";
+    if (roaEditingArp){
+      const idx = ROA_RECORDS.findIndex(r => r.arpNo === roaEditingArp);
+      if (idx > -1) ROA_RECORDS[idx] = data;
+      showToast("ARP " + data.arpNo + " updated successfully.", "success");
+    } else {
+      ROA_RECORDS.unshift(data);
+      showToast("ARP " + data.arpNo + " encoded and saved successfully.", "success");
+    }
+    showView("roa-list");
+  }
+
+  document.getElementById("roaForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const banner = document.getElementById("roaFormBanner");
+    try {
+      if (!validateRoaForm()){
+        banner.textContent = "Please correct the highlighted fields before saving.";
+        banner.className = "form-banner error show";
+        showToast("Please correct the highlighted fields before saving.", "error");
+        const firstInvalid = document.querySelector(".field.invalid input, .field.invalid select");
+        if (firstInvalid) firstInvalid.focus();
+        return;
+      }
+      const tCode = document.getElementById("tCode").value;
+      if (tCode === "X"){
+        openConfirmModal({
+          title:"Confirm Permanent Cancellation",
+          body:"This marks ARP " + document.getElementById("arpNo").value + " as permanently cancelled in the shared database. This action cannot be undone. Continue?",
+          confirmLabel:"Yes, Cancel This ARP",
+          onConfirm: saveRoaRecord
+        });
+        return;
+      }
+      saveRoaRecord();
+    } catch (err){
+      console.error("Save failed:", err);
+      banner.textContent = "Something went wrong while saving. Please try again.";
+      banner.className = "form-banner error show";
+      showToast("Something went wrong while saving. Please try again.", "error");
+    }
+  });
+  document.getElementById("roaCancelBtn").addEventListener("click", () => showView("roa-list"));
+
+  /* =====================================================================
+     SORTING + PAGINATION
+  ===================================================================== */
+  const PAGE_SIZE = 5;
+  const SORT_STATE = { key:null, dir:1 };
+  let ROA_PAGE = 1;
+
+  function sortRows(rows){
+    if (!SORT_STATE.key) return rows;
+    const { key, dir } = SORT_STATE;
+    return [...rows].sort((a, b) => {
+      let av = a[key], bv = b[key];
+      if (typeof av === "string"){ av = av.toLowerCase(); bv = String(bv).toLowerCase(); }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }
+  function paginate(rows){
+    const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    if (ROA_PAGE > totalPages) ROA_PAGE = totalPages;
+    if (ROA_PAGE < 1) ROA_PAGE = 1;
+    const start = (ROA_PAGE - 1) * PAGE_SIZE;
+    return { pageRows: rows.slice(start, start + PAGE_SIZE), page: ROA_PAGE, totalPages, total: rows.length, start: rows.length ? start + 1 : 0, end: Math.min(start + PAGE_SIZE, rows.length) };
+  }
+  function updatePaginationUI(start, end, total, page, totalPages){
+    document.getElementById("roaPageInfo").textContent = total ? ("Showing " + start + "\u2013" + end + " of " + total) : "No matching records";
+    document.getElementById("roaPrevBtn").disabled = page <= 1;
+    document.getElementById("roaNextBtn").disabled = page >= totalPages;
+  }
+  document.getElementById("roaPrevBtn").addEventListener("click", () => { ROA_PAGE--; applyFilters(); });
+  document.getElementById("roaNextBtn").addEventListener("click", () => { ROA_PAGE++; applyFilters(); });
+
+  document.querySelectorAll('#view-roa-list th[data-sort]').forEach(th => {
+    const activate = () => {
+      const key = th.dataset.sort;
+      if (SORT_STATE.key === key) SORT_STATE.dir *= -1; else { SORT_STATE.key = key; SORT_STATE.dir = 1; }
+      document.querySelectorAll('#view-roa-list th[data-sort]').forEach(t => t.setAttribute("aria-sort","none"));
+      th.setAttribute("aria-sort", SORT_STATE.dir === 1 ? "ascending" : "descending");
+      ROA_PAGE = 1;
+      applyFilters();
+    };
+    th.addEventListener("click", activate);
+    th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); activate(); } });
+  });
+
+  /* =====================================================================
+     SEARCH + FILTER + RENDER (ROA list)
+  ===================================================================== */
+  const sanitizeRe = /[^a-zA-Z0-9\s\-]/g;
+  function applyFilters(){
+    try {
+      const rawTerm = document.getElementById("globalSearch").value;
+      const cleaned = rawTerm.replace(sanitizeRe, "");
+      document.getElementById("searchHint").classList.toggle("show", cleaned !== rawTerm);
+      const term = cleaned.trim().toLowerCase();
+      const cls = document.getElementById("classFilter").value;
+      const brgy = document.getElementById("barangayFilter").value;
+      const status = document.getElementById("statusFilter").value;
+
+      let rows = ROA_RECORDS.filter(r => {
+        const matchesTerm = !term || r.owner.toLowerCase().includes(term) || r.arpNo.toLowerCase().includes(term) || r.pin.toLowerCase().includes(term);
+        const matchesCls = !cls || r.classification === cls;
+        const matchesBrgy = !brgy || r.barangay === brgy;
+        const matchesStatus = !status || r.taxStatus === status;
+        return matchesTerm && matchesCls && matchesBrgy && matchesStatus;
+      });
+      renderRoaTable(rows);
+    } catch (err){
+      console.error("Search/filter failed:", err);
+      showToast("Something went wrong while filtering the list.", "error");
+    }
+  }
+  document.getElementById("globalSearch").addEventListener("input", () => { ROA_PAGE = 1; applyFilters(); });
+  ["classFilter","barangayFilter","statusFilter"].forEach(id => {
+    document.getElementById(id).addEventListener("change", () => { ROA_PAGE = 1; applyFilters(); });
+  });
+
+  function statusTagClass(status){
+    if (status === "Taxable") return "taxable";
+    if (status === "Exempt") return "exempt";
+    return "cancelled";
+  }
+
+  function renderRoaTable(rows){
+    const body = document.getElementById("roaTableBody");
+    const count = document.getElementById("roaCount");
+    const sorted = sortRows(rows);
+    const { pageRows, page, totalPages, total, start, end } = paginate(sorted);
+    if (!pageRows.length){
+      body.innerHTML = '<tr class="empty-row"><td colspan="12">No ROA records match your search or filter.</td></tr>';
+    } else {
+      body.innerHTML = pageRows.map(r => `
+        <tr>
+          <td>${escapeHtml(r.arpNo)}</td><td>${escapeHtml(r.owner)}</td><td>${escapeHtml(r.pin)}</td>
+          <td>${escapeHtml(r.barangay)}</td><td>${escapeHtml(r.classification)}</td>
+          <td>${r.landAreaPresent.toLocaleString()}</td><td>${peso(r.marketValuePresent)}</td><td>${peso(r.assessedValuePresent)}</td>
+          <td><span class="tag ${statusTagClass(r.taxStatus)}">${escapeHtml(r.taxStatus)}</span></td>
+          <td>${escapeHtml(r.tCode)}</td>
+          <td><span class="tag ${r.approved ? "approved" : "pending"}">${r.approved ? "Approved" : "Pending"}</span></td>
+          <td class="row-actions"><button type="button" data-edit-roa="${escapeHtml(r.arpNo)}">Edit</button></td>
+        </tr>`).join("");
+    }
+    if (count) count.textContent = total + " of " + ROA_RECORDS.length + " shown";
+    updatePaginationUI(start, end, total, page, totalPages);
+  }
+  document.getElementById("roaTableBody").addEventListener("click", e => {
+    const btn = e.target.closest("[data-edit-roa]");
+    if (!btn) return;
+    const record = ROA_RECORDS.find(r => r.arpNo === btn.dataset.editRoa);
+    if (record){ showView("roa-form"); resetRoaForm(record); }
+  });
+
+  /* =====================================================================
+     DASHBOARD
+  ===================================================================== */
+  function renderDashboard(){
+    const active = ROA_RECORDS.filter(r => r.tCode !== "X");
+    document.getElementById("statTotal").textContent = ROA_RECORDS.length;
+    document.getElementById("statAV").textContent = peso(active.reduce((s, r) => s + r.assessedValuePresent, 0));
+    document.getElementById("statTaxable").textContent = active.filter(r => r.taxStatus === "Taxable").length;
+    document.getElementById("statPending").textContent = ROA_RECORDS.filter(r => !r.approved).length;
+
+    const recent = [...ROA_RECORDS].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 5);
+    document.getElementById("recentRoaBody").innerHTML = recent.map(r => `
+      <tr><td>${escapeHtml(r.arpNo)}</td><td>${escapeHtml(r.owner)}</td><td>${escapeHtml(r.barangay)}</td>
+      <td>${peso(r.assessedValuePresent)}</td><td><span class="tag ${statusTagClass(r.taxStatus)}">${escapeHtml(r.taxStatus)}</span></td></tr>`).join("");
+
+    const byClass = {};
+    active.forEach(r => { byClass[r.classification] = (byClass[r.classification] || 0) + 1; });
+    document.getElementById("byClassBody").innerHTML = Object.entries(byClass).map(([k,v]) => `<tr><td>${escapeHtml(k)}</td><td style="text-align:right;font-weight:600;">${v}</td></tr>`).join("");
+
+    const byBrgy = {};
+    active.forEach(r => { byBrgy[r.barangay] = (byBrgy[r.barangay] || 0) + 1; });
+    document.getElementById("byBarangayBody").innerHTML = Object.entries(byBrgy).map(([k,v]) => `<tr><td>${escapeHtml(k)}</td><td style="text-align:right;font-weight:600;">${v}</td></tr>`).join("");
+  }
+
+  /* =====================================================================
+     REPORTS
+  ===================================================================== */
+  let currentReportId = null;
+  function renderReportsList(){
+    document.getElementById("reportsListBody").innerHTML = REPORTS.map((r, i) => `
+      <li><button class="report-list-item" type="button" data-view="report-${r.id}">
+        <span class="r-num">${i + 1}</span><span>${escapeHtml(r.title)}</span><span class="r-arrow">&rarr;</span>
+      </button></li>`).join("");
+  }
+  function resetReportDetail(){
+    document.getElementById("reportBarangay").value = "All Barangays";
+    document.getElementById("reportFrom").value = "";
+    document.getElementById("reportTo").value = "";
+    document.getElementById("reportPreviewEmpty").style.display = "block";
+    document.getElementById("reportPreviewEmpty").textContent = "Set filters and click Generate to preview this report.";
+    document.getElementById("reportPreviewResult").style.display = "none";
+    document.getElementById("exportPdfBtn").disabled = true;
+    document.getElementById("exportCsvBtn").disabled = true;
+  }
+  function buildReportRows(reportId, barangay, from, to){
+    let rows = [...ROA_RECORDS];
+    if (reportId === "roll") rows = rows.filter(r => r.taxStatus === "Taxable");
+    else if (reportId === "exempt") rows = rows.filter(r => r.taxStatus === "Exempt");
+    else if (reportId === "new") rows = rows.filter(r => r.tCode === "N");
+    else if (reportId === "reassessed") rows = rows.filter(r => r.tCode === "R");
+    else if (reportId === "cancelled") rows = rows.filter(r => r.tCode === "X");
+    else if (reportId === "pending") rows = rows.filter(r => !r.approved);
+    if (barangay && barangay !== "All Barangays") rows = rows.filter(r => r.barangay === barangay);
+    if (from) rows = rows.filter(r => r.date >= from);
+    if (to) rows = rows.filter(r => r.date <= to);
+    return rows;
+  }
+  document.getElementById("reportGenerateBtn").addEventListener("click", () => {
+    try {
+      const barangay = document.getElementById("reportBarangay").value;
+      const from = document.getElementById("reportFrom").value;
+      const to = document.getElementById("reportTo").value;
+      if (from && to && from > to){ showToast("The \u201cFrom\u201d date must be on or before the \u201cTo\u201d date.", "error"); return; }
+
+      const rows = buildReportRows(currentReportId, barangay, from, to);
+      const emptyEl = document.getElementById("reportPreviewEmpty");
+      const resultEl = document.getElementById("reportPreviewResult");
+      const body = document.getElementById("reportPreviewBody");
+      const totalsRow = document.getElementById("reportTotalsRow");
+
+      if (!rows.length){
+        resultEl.style.display = "none";
+        emptyEl.style.display = "block";
+        emptyEl.textContent = "No records match this filter.";
+        document.getElementById("exportPdfBtn").disabled = true;
+        document.getElementById("exportCsvBtn").disabled = true;
+        showToast("Report generated \u2014 no matching records.", "info");
+      } else {
+        body.innerHTML = rows.map(r => `
+          <tr><td>${escapeHtml(r.arpNo)}</td><td>${escapeHtml(r.owner)}</td><td>${escapeHtml(r.barangay)}</td>
+          <td>${escapeHtml(r.classification)}</td><td>${r.landAreaPresent.toLocaleString()}</td>
+          <td>${peso(r.marketValuePresent)}</td><td>${peso(r.assessedValuePresent)}</td></tr>`).join("");
+        const totalArea = rows.reduce((s,r) => s + r.landAreaPresent, 0);
+        const totalMV = rows.reduce((s,r) => s + r.marketValuePresent, 0);
+        const totalAV = rows.reduce((s,r) => s + r.assessedValuePresent, 0);
+        totalsRow.textContent = "Totals: " + totalArea.toLocaleString() + " sqm \u2014 " + peso(totalMV) + " (MV) \u2014 " + peso(totalAV) + " (AV)";
+        emptyEl.style.display = "none";
+        resultEl.style.display = "block";
+        document.getElementById("exportPdfBtn").disabled = false;
+        document.getElementById("exportCsvBtn").disabled = false;
+        showToast("Report generated (" + rows.length + " record" + (rows.length === 1 ? "" : "s") + ").", "success");
+      }
+    } catch (err){
+      console.error("Report generation failed:", err);
+      showToast("Something went wrong generating this report. Please try again.", "error");
+    }
+  });
+  ["exportPdfBtn","exportCsvBtn"].forEach(id => {
+    document.getElementById(id).addEventListener("click", () => {
+      const format = id === "exportPdfBtn" ? "PDF" : "CSV";
+      showToast("Export to " + format + " would download here once connected to the reporting backend.", "info");
+    });
+  });
+
+  /* =====================================================================
+     LOGOUT
+  ===================================================================== */
+  document.getElementById("cancelLogoutBtn").addEventListener("click", () => showView("dashboard"));
+  document.getElementById("confirmLogoutBtn").addEventListener("click", () => {
+    showToast("You have been logged out (demo only).", "info");
+  });
+
+  /* =====================================================================
+     VIEW ROUTING
+  ===================================================================== */
+  const VIEW_TITLES = {
+    dashboard:["Dashboard","Assessor's Office"],
+    "roa-list":["Record of Assessment","Assessor's Office \u203a Record of Assessment"],
+    "roa-form":["Encode / Update ROA","Assessor's Office \u203a Record of Assessment \u203a Encode"],
+    "reports-list":["Reports","Assessor's Office \u203a Reports"],
+    logout:["Log Out","Assessor's Office"]
+  };
+  function showView(key){
+    try {
+      document.querySelectorAll(".content .page > div").forEach(v => v.style.display = "none");
+      document.querySelectorAll(".nav-item[data-view]").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll('.nav-item[data-view="' + key.split("-")[0] + '"], .nav-item[data-view="' + key + '"]').forEach(b => {});
+      let navKey = key;
+      if (key.startsWith("report-")) navKey = "reports-list";
+      document.querySelectorAll('.nav-item[data-view="' + navKey + '"]').forEach(b => b.classList.add("active"));
+
+      if (key === "dashboard"){ document.getElementById("view-dashboard").style.display = "block"; renderDashboard(); }
+      else if (key === "roa-list"){ document.getElementById("view-roa-list").style.display = "block"; ROA_PAGE = 1; applyFilters(); }
+      else if (key === "roa-form"){ document.getElementById("view-roa-form").style.display = "block"; }
+      else if (key === "reports-list"){ document.getElementById("view-reports-list").style.display = "block"; renderReportsList(); }
+      else if (key === "logout"){ document.getElementById("view-logout").style.display = "block"; }
+      else if (key.startsWith("report-")){
+        const id = key.replace("report-", "");
+        const report = REPORTS.find(r => r.id === id);
+        document.getElementById("view-report-detail").style.display = "block";
+        if (report){
+          currentReportId = id;
+          document.getElementById("reportTitle").textContent = report.title;
+          document.getElementById("reportDesc").textContent = report.desc;
+          resetReportDetail();
+        }
+      }
+
+      const titleInfo = VIEW_TITLES[key] || (key.startsWith("report-") ? ["Report Detail", "Assessor's Office \u203a Reports"] : ["Dashboard","Assessor's Office"]);
+      document.getElementById("pageTitle").textContent = titleInfo[0];
+      document.getElementById("pageBreadcrumb").textContent = titleInfo[1];
+      document.getElementById("mainContent").focus({ preventScroll:true });
+    } catch (err){
+      console.error("Navigation failed for view '" + key + "':", err);
+      showToast("Something went wrong loading that page. Please try again.", "error");
+    }
+  }
+
+  document.addEventListener("click", e => {
+    const btn = e.target.closest("[data-view]");
+    if (!btn) return;
+    const key = btn.dataset.view;
+    showView(key);
+    if (key === "roa-form" && btn.dataset.mode === "new") resetRoaForm(null);
+  });
+
+  /* ---- Initial render ---- */
+  showView("dashboard");
+})();
+</script>
+
+</body>
+</html>
