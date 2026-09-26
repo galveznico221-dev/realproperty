@@ -73,9 +73,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                                 onChange={(e) => setPeriod(e.target.value as InstallmentPeriod)}
                                 className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm focus:border-blue-600 focus:outline-none"
                             >
-                                <option value="FULL_YEAR">Full Year</option>
-                                <option value="Q1_Q3">Q1 - Q3 (1st Half)</option>
-                                <option value="Q2_Q4">Q2 - Q4 (2nd Half)</option>
+                                <option value="FULL_YEAR">FULL YEAR (100%)</option>
+                                <option value="Q1">Quarter 1 (25%)</option>
+                                <option value="Q2">Quarter 2 (25%)</option>
+                                <option value="Q3">Quarter 3 (25%)</option>
+                                <option value="Q4">Quarter 4 (25%)</option>
                             </select>
                         </div>
 

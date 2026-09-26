@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { PropertyAccount, LedgerBillSummaryDto } from '../types/treasury';
+import type { PropertyAccount, LedgerBillSummaryDto, InstallmentPeriod } from '../types/treasury';
 import { usePropertyLedgers } from '../hooks/usePropertyLedgers';
 import { usePostPayments } from '../hooks/useTreasury';
 import { treasuryApi } from '../services/treasuryApi';
@@ -41,7 +41,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
         discountAmount: number;
         penaltyAmount: number;
     } | null>(null);
-
+    const [selectedPeriod, setSelectedPeriod] = useState<InstallmentPeriod>('FULL_YEAR');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
     const [orBasicInput, setOrBasicInput] = useState<string>('2026-0005');
     const [orSefInput, setOrSefInput] = useState<string>('2026-0006');
@@ -60,6 +60,49 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
     // Toast State
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [isToastError, setIsToastError] = useState<boolean>(false);
+    // Inside TreasuryDashboard.tsx, derive the active modal amount:
+    const activeModalDue = useMemo(() => {
+        if (!targetLedgerForPayment) return 0;
+
+        // 1. If FULL_YEAR, use the ledger row's full-year total
+        if (selectedPeriod === 'FULL_YEAR') {
+            return targetLedgerForPayment.totalTaxDue;
+        }
+
+        // 2. Each quarter is 25% of annual base tax
+        const quarterBase = (targetLedgerForPayment.basicTax + targetLedgerForPayment.sefTax) * 0.25;
+
+        const [yearStr, monthStr] = paymentDate.split('-');
+        const payYear = Number(yearStr);
+        const payMonth = Number(monthStr);
+        const taxYear = targetLedgerForPayment.taxYear;
+
+        let discount = 0;
+
+        const quarterCutoff =
+            selectedPeriod === 'Q1' ? 3 :
+                selectedPeriod === 'Q2' ? 6 :
+                    selectedPeriod === 'Q3' ? 9 : 12;
+
+        if (payYear < taxYear) {
+            // Advance discount (December only)
+            if (payMonth === 12) {
+                discount = quarterBase * 0.20;
+            }
+        } else if (payYear === taxYear && payMonth <= quarterCutoff) {
+            // Current year on time: only Q1 paid on or before March earns 10% prompt discount
+            if (selectedPeriod === 'Q1' && payMonth <= 3) {
+                discount = quarterBase * 0.10;
+            }
+        }
+
+        // 3. Unified statutory penalty months: includes elapsed years!
+        const penaltyMonths = Math.max(0, ((payYear - taxYear) * 12) + payMonth - quarterCutoff);
+        const penaltyRate = Math.min(penaltyMonths * 0.02, 0.72);
+        const penalty = quarterBase * penaltyRate;
+
+        return Number((quarterBase - discount + penalty).toFixed(2));
+    }, [targetLedgerForPayment, selectedPeriod, paymentDate]);
 
     useEffect(() => {
         if (toastMessage) {
@@ -89,6 +132,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
         treasuryApi.searchProperties('', 0, 50).then((res) => {
             if (res.content && res.content.length > 0) {
                 setPropertiesList(res.content);
+
                 if (!initialPin) {
                     setSelectedPropertyPin(res.content[0].pin);
                 }
@@ -183,6 +227,14 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
             const isAdvanceYear = ledger.taxYear > payYear;
             const isAdvanceLocked = isAdvanceYear && payMonth !== 12;
 
+
+            const unpaidOlderYears = rawLedgers
+                .filter((l) => l.taxYear < ledger.taxYear && l.status !== 'PAID'
+                ).map((l) => l.taxYear);
+
+            const isBlockedByPriorDelinquency = unpaidOlderYears.length > 0;
+
+
             if (isSettled) {
                 return {
                     ...ledger,
@@ -194,6 +246,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
                     discountAmount: 0,
                     totalTaxDue: 0,
                     isSettled: true,
+                    isBlockedByPriorDelinquency: false,
                 };
             }
 
@@ -233,6 +286,8 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
                 totalTaxDue,
                 isSettled: false,
                 isAdvanceLocked,
+                isBlockedByPriorDelinquency,
+                priorDelinquentYears: unpaidOlderYears,
             };
         });
     }, [rawLedgers, paymentDate]);
@@ -254,6 +309,10 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
 
     // Trigger payment modal for specific year
     const handleOpenPaymentModal = (item: typeof computedLedgers[0]) => {
+        const cleanPin = currentProperty.pin.trim().replace(/[\s/]+/g, '-');
+        setOrBasicInput(`${item.taxYear}-${cleanPin}-B`);
+        setOrSefInput(`${item.taxYear}-${cleanPin}-S`);
+
         setTargetLedgerForPayment({
             id: item.id,
             taxYear: item.taxYear,
@@ -263,9 +322,16 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
             discountAmount: item.discountAmount,
             penaltyAmount: item.penaltyAmount,
         });
+
+        // If partial, set to next payable quarter; otherwise default to FULL_YEAR
+        if (item.status === 'PARTIAL' && item.nextPayablePeriod) {
+            setSelectedPeriod(item.nextPayablePeriod);
+        } else {
+            setSelectedPeriod('FULL_YEAR');
+        }
+
         setIsConfirmModalOpen(true);
     };
-
     // -------------------------------------------------------------
     // 5. Submit Payment Handler
     // -------------------------------------------------------------
@@ -277,11 +343,11 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
             await postPaymentMutation.mutateAsync({
                 ledgerId: targetLedgerForPayment.id,
                 payment: {
-                    period: 'FULL_YEAR',
-                    amountPaid: targetLedgerForPayment.totalTaxDue,
+                    period: selectedPeriod,
                     orBasic: orBasicInput.trim(),
                     orSef: orSefInput.trim() || undefined,
                     datePaid: paymentDate,
+                    amountPaid: activeModalDue,
                 },
                 isAmnesty: false,
             });
@@ -321,6 +387,27 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
     return (
         <div className="content">
             {/* 1. TOP SELECTION BAR */}
+            <div className="print-only" style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <p style={{ margin: 0, fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                    Republic of the Philippines
+                </p>
+                <p style={{ margin: 0, fontSize: '11px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                    Province of Camarines Norte
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Municipality of Talisay
+                </p>
+                <h2 style={{ margin: '6px 0 2px', fontSize: '15px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Office of the Municipal Treasurer
+                </h2>
+                <div style={{ margin: '8px auto', width: '80px', height: '2px', background: '#000' }} />
+                <h3 style={{ margin: '8px 0 0', fontSize: '14px', fontWeight: 700, letterSpacing: '1px' }}>
+                    REAL PROPERTY TAX STATEMENT OF ACCOUNT
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#475569' }}>
+                    As of calculation date: {paymentDate}
+                </p>
+            </div>
             <div className="card">
                 <div className="card__head">
                     <h3>Statement of Account — Account Ledger</h3>
@@ -397,6 +484,40 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
                             Statutory assessment breakdown computed as of {paymentDate}
                         </p>
                     </div>
+                </div>
+                {/* ----------------- OFFICIAL PRINT SIGNATORIES ----------------- */}
+                <div className="print-only" style={{ marginTop: '40px', pageBreakInside: 'avoid' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', textAlign: 'center' }}>
+                        {/* Left Signatory: Prepared By */}
+                        <div>
+                            <p style={{ fontSize: '11.5px', margin: 0, textAlign: 'left', color: '#475569' }}>
+                                Prepared and Computed by:
+                            </p>
+                            <div style={{ marginTop: '44px', borderBottom: '1px solid #000', width: '80%', marginInline: 'auto' }} />
+                            <b style={{ display: 'block', fontSize: '12px', marginTop: '6px', textTransform: 'uppercase' }}>
+                                Liquidating Officer / Deputy Assessor
+                            </b>
+                            <span style={{ fontSize: '11px', color: '#475569' }}>RPT Division — Staff</span>
+                        </div>
+
+                        {/* Right Signatory: Municipal Treasurer */}
+                        <div>
+                            <p style={{ fontSize: '11.5px', margin: 0, textAlign: 'left', color: '#475569' }}>
+                                Certified Correct:
+                            </p>
+                            <div style={{ marginTop: '44px', borderBottom: '1px solid #000', width: '80%', marginInline: 'auto' }} />
+                            <b style={{ display: 'block', fontSize: '12px', marginTop: '6px', textTransform: 'uppercase' }}>
+                                Municipal Treasurer
+                            </b>
+                            <span style={{ fontSize: '11px', color: '#475569' }}>Office of the Municipal Treasurer</span>
+                        </div>
+                    </div>
+
+                    {/* Official Statutory Disclaimer */}
+                    <p style={{ marginTop: '28px', fontSize: '9.5px', color: '#64748b', textAlign: 'center', fontStyle: 'italic' }}>
+                        Notice: This Statement of Account is an estimate based on statutory records pursuant to RA 7160 (Local Government Code of 1991).
+                        Final payment amounts are subject to change based on actual settlement dates and counter audit verification.
+                    </p>
                 </div>
 
                 <div className="table-wrap">
@@ -502,15 +623,31 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
                                             >
                                                 Opens Dec {row.taxYear - 1}
                                             </button>
-                                        ) : (
+                                        ) : row.isBlockedByPriorDelinquency ? (
                                             <button
                                                 type="button"
-                                                className="btn btn--primary btn--sm"
-                                                onClick={() => handleOpenPaymentModal(row)}
+                                                disabled
+                                                className="btn btn--ghost btn--sm"
+                                                title={`Cannot pay TY ${row.taxYear}. Please settle older delinquent year(s) first: ${row.priorDelinquentYears.join(', ')}`}
+                                                style={{
+                                                    opacity: 0.5,
+                                                    cursor: 'not-allowed',
+                                                    color: 'var(--red)',
+                                                    borderColor: 'var(--red)'
+                                                }}
                                             >
-                                                Accept Payment
+                                                Settle Year {Math.min(...row.priorDelinquentYears)} First
                                             </button>
-                                        )}
+                                        )
+                                            : (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn--primary btn--sm"
+                                                    onClick={() => handleOpenPaymentModal(row)}
+                                                >
+                                                    Accept Payment
+                                                </button>
+                                            )}
                                     </td>
                                 </tr>
                             ))}
@@ -588,10 +725,26 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
                                         <span className="muted">Total Tax Due:</span>
-                                        <b style={{ color: 'var(--blue)' }}>{peso(targetLedgerForPayment.totalTaxDue)}</b>
+                                        <b style={{ color: 'var(--blue)' }}>{peso(activeModalDue)}</b>
                                     </div>
                                 </div>
 
+                                <div className="field">
+                                    <label htmlFor="modalPeriod">Installment Period</label>
+                                    <select
+                                        id="modalPeriod"
+                                        className="input"
+                                        value={selectedPeriod}
+                                        onChange={(e) => setSelectedPeriod(e.target.value as InstallmentPeriod)}
+                                        disabled={rawLedgers.find(l => l.id === targetLedgerForPayment.id)?.status === 'PARTIAL'}
+                                    >
+                                        <option value="FULL_YEAR">FULL YEAR (100%)</option>
+                                        <option value="Q1">Quarter 1 (25%)</option>
+                                        <option value="Q2">Quarter 2 (25%)</option>
+                                        <option value="Q3">Quarter 3 (25%)</option>
+                                        <option value="Q4">Quarter 4 (25%)</option>
+                                    </select>
+                                </div>
                                 <div className="field">
                                     <label htmlFor="modalOrBasic">O.R. No. (Basic Tax)</label>
                                     <input
@@ -670,6 +823,8 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({ initialPin
 
                         <div className="receipt">
                             <div className="receipt__check" aria-hidden="true">
+                                <dt>Billing Period</dt>
+                                <dd>{receiptData.period === 'FULL_YEAR' ? 'Full Year (100%)' : receiptData.period}</dd>
                                 <Icons.Check />
                             </div>
                             <div className="receipt__title">Payment Recorded Successfully</div>

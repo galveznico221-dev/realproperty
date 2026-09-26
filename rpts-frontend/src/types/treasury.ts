@@ -1,7 +1,7 @@
 export type PropertyKind = 'LA' | 'BL' | 'MC';
 export type Taxability = 'TAXABLE' | 'EXEMPT';
 export type PaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
-export type InstallmentPeriod = 'FULL_YEAR' | 'Q1_Q3' | 'Q2_Q4';
+export type InstallmentPeriod = 'FULL_YEAR' | 'Q1' | 'Q2' | 'Q3' | 'Q4';
 
 export interface PropertyAccount {
     id: number;
@@ -41,6 +41,7 @@ export interface LedgerBillSummaryDto {
     netDue: number;
     amountPaid: number;
     status: PaymentStatus;
+    nextPayablePeriod?: InstallmentPeriod;
 }
 
 export interface SpringPage<T> {
